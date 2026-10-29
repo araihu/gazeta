@@ -73,3 +73,22 @@ func TestFilesRejectSymlinkAncestor(t *testing.T) {
 		t.Fatal("followed symlink ancestor")
 	}
 }
+
+func TestProfilePageRequiresOneMatchingAuthor(t *testing.T) {
+	for name, authors := range map[string]string{
+		"missing":   "authors: {}\n",
+		"unrelated": "authors:\n  Alex Example: {url: /different/}\n",
+		"duplicate": "authors:\n  Alex Example: {url: /about/}\n  Another Author: {url: /about/}\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			root := exampleRoot(t)
+			text := "version: 1\n" + authors + "page_types:\n  /about/: ProfilePage\n"
+			if err := os.WriteFile(filepath.Join(root, "blog.yaml"), []byte(text), 0644); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := loadEngine(root); err == nil {
+				t.Fatal("accepted profile without unique matching author")
+			}
+		})
+	}
+}

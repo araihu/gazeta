@@ -56,6 +56,10 @@ func TestBuildIndependentIdentities(t *testing.T) {
 			replaceTestFile(t, root, "site.yaml", "https://notes.example", identity.domain)
 			replaceTestFile(t, root, "blog.yaml", "Alex Example", identity.author)
 			replaceTestFile(t, root, "blog.yaml", "/about/\n", identity.profile+"\n")
+			if !strings.HasPrefix(identity.profile, "/") {
+				replaceTestFile(t, root, "blog.yaml", "/about/: ProfilePage", "/about/: AboutPage")
+			}
+
 			replaceTestFile(t, root, "content/blogs/hello/index.md", "Alex Example", identity.author)
 			if err := writeFile(filepath.Join(root, "assets/editorial.css"), []byte("body { --color-primary: "+identity.color+"; }")); err != nil {
 				t.Fatal(err)
@@ -179,5 +183,85 @@ func TestAuthoredHTMLRequiresOptIn(t *testing.T) {
 	}
 	if !strings.Contains(readTestFile(t, root, "public/blogs/hello/index.html"), "window.reviewedDemo=true") {
 		t.Fatal("reviewed demo lost")
+	}
+}
+
+func TestFlatPageStructuredDataUsesPublishedRoute(t *testing.T) {
+	root := exampleRoot(t)
+	for _, source := range []string{"privacy.md", "legal/privacy.md", "legal/myindex.md"} {
+		if err := writeFile(filepath.Join(root, "content", source), []byte("+++\ntitle = 'Privacy'\n+++\nOur privacy statement.\n")); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := Build(context.Background(), root, buildTime); err != nil {
+		t.Fatal(err)
+	}
+	for _, output := range []string{"privacy.html", "legal/privacy.html", "legal/myindex.html"} {
+		page, err := readHTML([]byte(readTestFile(t, root, "public/"+output)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var data map[string]any
+		if err := json.Unmarshal(page.Schemas[0], &data); err != nil {
+			t.Fatal(err)
+		}
+		if page.Canonical != "https://notes.example/"+output || data["url"] != page.Canonical || data["@id"] != page.Canonical+"#webpage" {
+			t.Fatalf("incorrect page identity: %s %+v", page.Canonical, data)
+		}
+	}
+}
+
+func TestProfilePageBindsConfiguredAuthor(t *testing.T) {
+	for _, tc := range []struct{ source, route string }{{"about/index.md", "/about/"}, {"authors/alex.md", "/authors/alex.html"}} {
+		t.Run(tc.route, func(t *testing.T) {
+			root := exampleRoot(t)
+			replaceTestFile(t, root, "blog.yaml", "/about/: ProfilePage", tc.route+": ProfilePage")
+			replaceTestFile(t, root, "blog.yaml", "url: /about/", "url: "+tc.route)
+			if tc.source != "about/index.md" {
+				if err := writeFile(filepath.Join(root, "content", tc.source), []byte("+++\ntitle = 'About Alex'\n+++\nAlex writes about engineering.\n")); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := Build(context.Background(), root, buildTime); err != nil {
+				t.Fatal(err)
+			}
+			output := strings.TrimPrefix(tc.route, "/")
+			if strings.HasSuffix(output, "/") {
+				output += "index.html"
+			}
+			page, err := readHTML([]byte(readTestFile(t, root, "public/"+output)))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var profile struct {
+				Type       string `json:"@type"`
+				MainEntity struct {
+					Type      string `json:"@type"`
+					ID        string `json:"@id"`
+					Name, URL string
+				}
+			}
+			if err := json.Unmarshal(page.Schemas[0], &profile); err != nil {
+				t.Fatal(err)
+			}
+			canonical := "https://notes.example" + tc.route
+			if profile.Type != "ProfilePage" || profile.MainEntity.Type != "Person" || profile.MainEntity.Name != "Alex Example" || profile.MainEntity.URL != canonical || profile.MainEntity.ID != canonical+"#person" {
+				t.Fatalf("incorrect profile: %+v", profile)
+			}
+			html := readTestFile(t, root, "public/"+output)
+			if strings.Contains(html, `"image":`) {
+				t.Fatal("invented author portrait")
+			}
+			corrupt := strings.Replace(html, `"name":"Alex Example"`, `"name":"Unrelated Person"`, 1)
+			if corrupt == html {
+				t.Fatal("fixture did not alter author identity")
+			}
+			if err := os.WriteFile(filepath.Join(root, "public", output), []byte(corrupt), 0644); err != nil {
+				t.Fatal(err)
+			}
+			if err := Check(root, buildTime); err == nil {
+				t.Fatal("accepted unrelated profile identity")
+			}
+		})
 	}
 }

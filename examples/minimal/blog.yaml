@@ -4,4 +4,4 @@ authors:
   Alex Example:
     url: /about/
 page_types:
-  /about/: AboutPage
+  /about/: ProfilePage

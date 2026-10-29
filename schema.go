@@ -45,7 +45,7 @@ func (e *engine) pageStructuredData(d document) any {
 	if d.Source == "404.md" {
 		return nil
 	}
-	route := "/" + strings.TrimSuffix(d.Source, "index.md")
+	route := publicRoute(strings.TrimSuffix(d.Source, path.Ext(d.Source)) + ".html")
 	canonical := e.baseURL + (&url.URL{Path: route}).String()
 	kind := e.pageType(route)
 	page := map[string]any{
@@ -56,7 +56,7 @@ func (e *engine) pageStructuredData(d document) any {
 		page["description"] = d.Meta.Description
 	}
 	for name := range e.config.Authors {
-		if kind == "AboutPage" && e.authorURL(name) == canonical {
+		if (kind == "AboutPage" || kind == "ProfilePage") && e.authorURL(name) == canonical {
 			page["mainEntity"] = map[string]string{"@type": "Person", "@id": canonical + "#person", "name": name, "url": canonical}
 		}
 	}
@@ -92,4 +92,17 @@ func (e *engine) coverURL(d document) string {
 		return ""
 	}
 	return e.baseURL + (&url.URL{Path: path.Join(d.Route, d.Meta.Cover)}).String()
+}
+
+// publicRoute identifies directory indexes by basename, not by a filename suffix.
+// It mirrors the publication's Margo directory-index and standalone HTML URLs.
+func publicRoute(artifact string) string {
+	if path.Base(artifact) == "index.html" {
+		directory := path.Dir(artifact)
+		if directory == "." {
+			return "/"
+		}
+		return "/" + directory + "/"
+	}
+	return "/" + artifact
 }

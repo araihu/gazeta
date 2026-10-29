@@ -61,7 +61,7 @@ func (e *engine) checkNonPostSchema(page htmlPage, route string, posts []documen
 		return fmt.Errorf("missing WebSite reference")
 	}
 	for name := range e.config.Authors {
-		if kind == "AboutPage" && e.authorURL(name) == e.baseURL+route {
+		if (kind == "AboutPage" || kind == "ProfilePage") && e.authorURL(name) == e.baseURL+route {
 			person, ok := data["mainEntity"].(map[string]any)
 			if !ok || person["@type"] != "Person" || person["@id"] != e.baseURL+route+"#person" || person["name"] != name || person["url"] != e.authorURL(name) {
 				return fmt.Errorf("incorrect author identity")
