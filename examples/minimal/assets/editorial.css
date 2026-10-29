@@ -1,0 +1,7 @@
+.blog-home { max-width: 70rem; margin: auto; }
+.blog-content { max-width: 48rem; margin: auto; overflow-wrap: anywhere; }
+.blog-posts { padding: 0; list-style: none; display: grid; gap: 2rem; }
+.blog-post { min-width: 0; padding-block: 1rem; border-bottom: 1px solid currentColor; }
+.blog-post-image img { max-width: 100%; height: auto; }
+.blog-series, .blog-series-entry { padding: 1rem; border: 1px solid currentColor; border-radius: .5rem; }
+.blog-series-pagination { display: flex; flex-wrap: wrap; gap: 1rem; margin-block: 2rem; }

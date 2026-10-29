@@ -1,0 +1,34 @@
+version: 1
+source: .build/content
+output: public
+assets: local
+offline: true
+site:
+  name: Field Notes
+  description: Notes from a small engineering team.
+  base_url: https://notes.example
+  home: index.md
+  logo: assets/icon.svg
+  icon: assets/icon.svg
+  social_image:
+    path: assets/social.png
+    alt: Field Notes engineering journal
+layout:
+  kind: docs
+  default: {sidebar: false, toc: false, pagination: false}
+locales:
+  default: en
+  supported: [en]
+publication:
+  date_format: January 2, 2006
+navigation:
+  links:
+    - {label: Blog, href: /blogs/}
+    - {label: About, href: /about/}
+theme:
+  builtin: true
+  name: modern
+  color_mode: system
+  allow_switch_theme: true
+custom_css:
+  - css_url: assets/editorial.css
