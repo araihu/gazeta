@@ -183,7 +183,7 @@ func (e *engine) checkSite(root, public string, now time.Time) error {
 		if err != nil {
 			return err
 		}
-		route := "/" + strings.TrimSuffix(filepath.ToSlash(relative), "index.html")
+		route := publicRoute(filepath.ToSlash(relative))
 		if page.Language != e.language {
 			failures = append(failures, route+": incorrect language")
 		}

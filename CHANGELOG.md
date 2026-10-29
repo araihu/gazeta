@@ -1,3 +1,9 @@
+# v0.0.2
+
+- Add opt-in author ProfilePage data with one matching configured author. Generic AboutPage pages remain supported.
+- Correct JSON-LD and validation URLs for standalone Markdown pages, including filenames ending in myindex.md.
+- Document current Google recommendations and distinguish Schema.org data from supported rich results.
+
 # v0.0.1
 
 Gazeta extracts the editorial publication layer from Guigoes into a reusable Go module on Margo v0.0.29.

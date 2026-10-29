@@ -127,21 +127,24 @@ func loadEngine(root string) (*engine, error) {
 	for name := range c.Authors {
 		profile := e.authorURL(name)
 		route := strings.TrimPrefix(profile, e.baseURL)
-		if c.PageTypes[route] == "AboutPage" {
+		if kind := c.PageTypes[route]; kind == "AboutPage" || kind == "ProfilePage" {
 			if previous, exists := profiles[profile]; exists {
-				return nil, fmt.Errorf("AboutPage %s must identify one author, got %s and %s", route, previous, name)
+				return nil, fmt.Errorf("%s %s must identify one author, got %s and %s", kind, route, previous, name)
 			}
 			profiles[profile] = name
 		}
 	}
 	for route, kind := range c.PageTypes {
-		if !strings.HasPrefix(route, "/") || !strings.HasSuffix(route, "/") || strings.Contains(route, "..") {
+		if !strings.HasPrefix(route, "/") || (!strings.HasSuffix(route, "/") && !strings.HasSuffix(route, ".html")) || strings.Contains(route, "..") || strings.HasPrefix(route, "//") || strings.ContainsAny(route, "\\?#\r\n\t") {
 			return nil, fmt.Errorf("invalid page route: %s", route)
 		}
 		switch kind {
-		case "WebPage", "AboutPage", "ContactPage", "CollectionPage":
+		case "WebPage", "AboutPage", "ProfilePage", "ContactPage", "CollectionPage":
 		default:
 			return nil, fmt.Errorf("unsupported page type: %s", kind)
+		}
+		if kind == "ProfilePage" && profiles[e.baseURL+route] == "" {
+			return nil, fmt.Errorf("ProfilePage %s requires one matching configured author URL", route)
 		}
 	}
 	if c.RequiredURLs != "" && !fs.ValidPath(c.RequiredURLs) {

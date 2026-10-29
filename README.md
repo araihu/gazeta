@@ -9,9 +9,9 @@ Extracted from [Guigoes](https://github.com/guilycst/guigoes-v2), its first prod
 Requires Go 1.27.3+. Copy `examples/minimal` into your blog repository and use the pinned CLI:
 
 ```sh
-go run github.com/araihu/gazeta/cmd/gazeta@v0.0.1 build
-go run github.com/araihu/gazeta/cmd/gazeta@v0.0.1 check
-go run github.com/araihu/gazeta/cmd/gazeta@v0.0.1 serve
+go run github.com/araihu/gazeta/cmd/gazeta@v0.0.2 build
+go run github.com/araihu/gazeta/cmd/gazeta@v0.0.2 check
+go run github.com/araihu/gazeta/cmd/gazeta@v0.0.2 serve
 ```
 
 `serve` exposes the existing output at `http://127.0.0.1:1313`. Run `build` after editing. Each command accepts an optional publication root argument.
@@ -33,7 +33,7 @@ authors:
   Alex Example:
     url: /about/
 page_types:
-  /about/: AboutPage
+  /about/: ProfilePage
   /contact/: ContactPage
   /projects/: CollectionPage
 # Optional compatibility checks and additional public files:
@@ -45,7 +45,7 @@ labels:
   all_articles: All articles
 ```
 
-Authors match frontmatter names exactly. Profiles may use root-relative or HTTPS URLs. Unknown guests keep their names without inheriting another author's profile. An `AboutPage` matching one configured profile receives that author's `Person` data. `page_types` accepts `WebPage`, `AboutPage`, `ContactPage` and `CollectionPage`.
+Authors match frontmatter names exactly. Profiles may use root-relative or HTTPS URLs. Unknown guests keep their names without inheriting another author's profile. A `ProfilePage` requires exactly one configured author whose profile URL matches the page. It describes that author as `mainEntity`. Generic `AboutPage` behavior remains available. `page_types` accepts `WebPage`, `AboutPage`, `ProfilePage`, `ContactPage` and `CollectionPage`, keyed by directory routes or standalone `.html` routes. See [structured data](docs/structured-data.md) for the schema contract and live validation procedure.
 
 Labels default to English. Available keys are `articles`, `blog`, `tags`, `categories`, `categories_body`, `not_found`, `not_found_body`, `all_articles`, `series`, `part`, `series_index`, `continue_series`, `start_series`, `start_first`, `previous`, `next`, `redirecting` and `open_article`. The two `*_body` fields accept Markdown. `files` copies regular files or directories, rejects symlinks and refuses to overwrite a different generated file. It cannot copy content or build directories around visibility filtering. The optional `static/` directory supplies hosting files.
 
@@ -82,7 +82,7 @@ Configuration and Git content are trusted build inputs. Margo layout commands an
 
 Authored raw HTML is denied by default through Margo's compiler policy. `unsafe_html: true` explicitly permits reviewed HTML/JavaScript demos. Gazeta's own escaped listing and series markup renders in either mode. Do not enable this option for unreviewed content.
 
-`v0.0.1` is an initial extraction, with domain-root hosting and one locale per blog. No content scheduler or provider-specific deploy credentials are included. A Git push can run the build and deploy `public/` through your existing pipeline.
+`v0.0.x` is an initial extraction, with domain-root hosting and one locale per blog. No content scheduler or provider-specific deploy credentials are included. A Git push can run the build and deploy `public/` through your existing pipeline.
 
 ## Verify and release
 
