@@ -1,0 +1,7 @@
+version: 1
+home_limit: 4
+authors:
+  Alex Example:
+    url: /about/
+page_types:
+  /about/: AboutPage
