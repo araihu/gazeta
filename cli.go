@@ -24,7 +24,7 @@ func Run(args []string) error {
 	case "check":
 		return Check(root, time.Now())
 	case "serve":
-		if _, err := loadengine(root); err != nil {
+		if _, err := loadEngine(root); err != nil {
 			return err
 		}
 		if err := mime.AddExtensionType(".webmanifest", "application/manifest+json"); err != nil {

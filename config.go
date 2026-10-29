@@ -74,7 +74,7 @@ func defaultConfig() config {
 	}}
 }
 
-func loadengine(root string) (*engine, error) {
+func loadEngine(root string) (*engine, error) {
 	c := defaultConfig()
 	data, err := os.ReadFile(filepath.Join(root, "blog.yaml"))
 	if err != nil {
@@ -170,7 +170,7 @@ func loadengine(root string) (*engine, error) {
 // Build renders and validates a publication before replacing root/public.
 // now controls draft/future visibility. Only reviewed Git content should be built.
 func Build(ctx context.Context, root string, now time.Time) error {
-	e, err := loadengine(root)
+	e, err := loadEngine(root)
 	if err != nil {
 		return err
 	}
@@ -193,7 +193,7 @@ func Build(ctx context.Context, root string, now time.Time) error {
 
 // Check validates an existing root/public against its content and configuration.
 func Check(root string, now time.Time) error {
-	e, err := loadengine(root)
+	e, err := loadEngine(root)
 	if err != nil {
 		return err
 	}

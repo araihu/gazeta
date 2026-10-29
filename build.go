@@ -219,9 +219,6 @@ func (e *engine) buildSite(root string, now time.Time) error {
 			return err
 		}
 	}
-	if err := copyOptionalTree(filepath.Join(root, "static"), render); err != nil {
-		return err
-	}
 	for _, feed := range []struct {
 		file, title string
 		posts       []document
@@ -244,6 +241,9 @@ func (e *engine) buildSite(root string, now time.Time) error {
 	if err := writeFile(filepath.Join(render, "robots.txt"), []byte("User-agent: *\nAllow: /\nSitemap: "+e.baseURL+"/sitemap.xml\n")); err != nil {
 		return err
 	}
+	if err := copyOptionalTree(filepath.Join(root, "static"), render); err != nil {
+		return err
+	}
 	if err := e.copyFiles(root, render); err != nil {
 		return err
 	}
@@ -251,6 +251,9 @@ func (e *engine) buildSite(root string, now time.Time) error {
 		return err
 	}
 	if err := e.checkSite(root, render, now); err != nil {
+		return err
+	}
+	if err := e.ctx.Err(); err != nil {
 		return err
 	}
 	if err := publishDirectory(render, filepath.Join(root, "public")); err != nil {
