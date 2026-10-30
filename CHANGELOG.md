@@ -1,3 +1,9 @@
+## v0.0.3
+
+- Add `gazeta verify` and a Go API for validating a deployed artifact against its local Margo manifest.
+- Check public HTML/schema, exact asset bytes, legacy redirects and missing-page HTTP status with bounded propagation retries.
+- Emit a JSON verification receipt without rebuilding or publishing.
+
 # v0.0.2
 
 - Add opt-in author ProfilePage data with one matching configured author. Generic AboutPage pages remain supported.
