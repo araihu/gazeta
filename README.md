@@ -9,9 +9,9 @@ Extracted from [Guigoes](https://github.com/guilycst/guigoes-v2), its first prod
 Requires Go 1.27.3+. Copy `examples/minimal` into your blog repository and use the pinned CLI:
 
 ```sh
-go run github.com/araihu/gazeta/cmd/gazeta@v0.0.2 build
-go run github.com/araihu/gazeta/cmd/gazeta@v0.0.2 check
-go run github.com/araihu/gazeta/cmd/gazeta@v0.0.2 serve
+go run github.com/araihu/gazeta/cmd/gazeta@v0.0.3 build
+go run github.com/araihu/gazeta/cmd/gazeta@v0.0.3 check
+go run github.com/araihu/gazeta/cmd/gazeta@v0.0.3 serve
 ```
 
 `serve` exposes the existing output at `http://127.0.0.1:1313`. Run `build` after editing. Each command accepts an optional publication root argument.
@@ -74,7 +74,23 @@ Series use `series` plus a positive, unique `seriesPart`. Navigation only includ
 
 Gazeta generates `/blogs/`, `/tags/`, `/categories/`, `404.html`, RSS, safe redirect stubs and Cloudflare-compatible `_redirects`. These generated page names are reserved. Root home and page content stay consumer-owned. Covers must be real local `assets/` files under the post. Native Margo social metadata and `BlogPosting.image` use the same cover; posts without a cover omit the JSON-LD image.
 
-Builds stage content in `.build/`, render through Margo, assemble public assets and use `site.MarshalManifest` for final byte identities. Validation checks canonical URLs, locale, JSON-LD, local links and fragments, social covers, RSS and configured legacy URLs before replacing `public/`. A failed build preserves the previous publication. A build lock prevents two writers on one root. After a crashed build, remove `.build/build.lock` only once its process has stopped.
+Builds stage content in `.build/`, render through Margo, assemble public assets and use `site.MarshalManifest` for final byte identities. Validation checks canonical URLs, locale, JSON-LD, local links and fragments, social covers, RSS and configured legacy URLs before replacing `public/`. `check` also verifies the existing artifact bytes against their native Margo manifest. A failed build preserves the previous publication. A build lock prevents two writers on one root. After a crashed build, remove `.build/build.lock` only once its process has stopped.
+
+## Verify a deployed publication
+
+After publishing a validated `public/` artifact, run:
+
+```sh
+go run github.com/araihu/gazeta/cmd/gazeta@v0.0.3 verify -timeout 3m
+```
+
+`verify` reads the existing artifact and `site.base_url`; it never rebuilds or deploys. It reuses Margo's manifest serializer to check local artifact integrity, then requires the public manifest to match before and after each complete pass. It checks every public asset, HTML content, canonical URL, locale, JSON-LD, social metadata, legacy HTTP redirects and missing-page status. Hosting control files such as `_headers` and `_redirects` are not requested as public resources.
+
+Non-HTML bytes must match exactly. HTML comparison allows JSON object formatting changes and the known hidden Cloudflare protection script, while retaining all publication content and metadata. This normalization changes comparison trees only. It never rewrites generated or served files. Redirects to unrelated destinations, stale content, duplicated JSON properties and soft 404 pages fail verification.
+
+The default total deadline is two minutes, with five seconds between failed passes. Use `-timeout` and `-interval` to change these limits. A successful command emits a JSON receipt with origin, manifest digest, page/asset/redirect counts and attempts. Keep the same validated artifact in the verification job; a fresh build could describe a different publication. Google Rich Results Test remains a separate external check.
+
+Go callers can use `gazeta.Verify(ctx, root, gazeta.VerifyOptions{})`. Options may supply a custom HTTP client, for example one trusting a private CA; verification still disables automatic redirects.
 
 ## Trust and release scope
 
