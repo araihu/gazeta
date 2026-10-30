@@ -9,9 +9,9 @@ Extracted from [Guigoes](https://github.com/guilycst/guigoes-v2), its first prod
 Requires Go 1.27.3+. Copy `examples/minimal` into your blog repository and use the pinned CLI:
 
 ```sh
-go run github.com/araihu/gazeta/cmd/gazeta@v0.0.3 build
-go run github.com/araihu/gazeta/cmd/gazeta@v0.0.3 check
-go run github.com/araihu/gazeta/cmd/gazeta@v0.0.3 serve
+go run github.com/araihu/gazeta/cmd/gazeta@v0.0.4 build
+go run github.com/araihu/gazeta/cmd/gazeta@v0.0.4 check
+go run github.com/araihu/gazeta/cmd/gazeta@v0.0.4 serve
 ```
 
 `serve` exposes the existing output at `http://127.0.0.1:1313`. Run `build` after editing. Each command accepts an optional publication root argument.
@@ -81,7 +81,7 @@ Builds stage content in `.build/`, render through Margo, assemble public assets 
 After publishing a validated `public/` artifact, run:
 
 ```sh
-go run github.com/araihu/gazeta/cmd/gazeta@v0.0.3 verify -timeout 3m
+go run github.com/araihu/gazeta/cmd/gazeta@v0.0.4 verify -timeout 3m
 ```
 
 `verify` reads the existing artifact and `site.base_url`; it never rebuilds or deploys. It reuses Margo's manifest serializer to check local artifact integrity, then requires the public manifest to match before and after each complete pass. It checks every public asset, HTML content, canonical URL, locale, JSON-LD, social metadata, legacy HTTP redirects and missing-page status. Hosting control files such as `_headers` and `_redirects` are not requested as public resources.
@@ -91,6 +91,12 @@ Non-HTML bytes must match exactly. HTML comparison allows JSON object formatting
 The default total deadline is two minutes, with five seconds between failed passes. Use `-timeout` and `-interval` to change these limits. A successful command emits a JSON receipt with origin, manifest digest, page/asset/redirect counts and attempts. Keep the same validated artifact in the verification job; a fresh build could describe a different publication. Google Rich Results Test remains a separate external check.
 
 Go callers can use `gazeta.Verify(ctx, root, gazeta.VerifyOptions{})`. Options may supply a custom HTTP client, for example one trusting a private CA; verification still disables automatic redirects.
+
+## Indexing and sitemaps
+
+Gazeta marks the generated 404 document with Margo's native `noindex: true` frontmatter. Margo emits robots metadata and leaves the error document out of `sitemap.xml` and `llms.txt`; missing URLs still need the hosting platform's HTTP 404 behavior.
+
+`gazeta check` requires the sitemap to contain each indexable canonical HTML page exactly once. It rejects missing pages, duplicate or unknown URLs, and pages marked `noindex`. Legacy aliases continue to use HTTP redirects and canonical targets instead of separate sitemap entries. The generated 404 document must retain its native `noindex, follow` metadata.
 
 ## Trust and release scope
 
