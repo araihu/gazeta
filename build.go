@@ -71,7 +71,7 @@ type rss struct {
 }
 
 func (e *engine) writeFeed(file, title string, posts []document) error {
-	feed := rss{Version: "2.0", Channel: rssChannel{Title: title, Link: e.baseURL + "/", Description: e.site.Site.Description, Language: e.language}}
+	feed := rss{Version: "2.0", Channel: rssChannel{Title: title, Link: e.baseURL + e.route("/"), Description: e.site.Site.Description, Language: e.language}}
 	for _, post := range posts {
 		feed.Channel.Items = append(feed.Channel.Items, rssItem{Title: post.Meta.Title, Link: e.baseURL + post.Route, GUID: e.baseURL + post.Route, Description: post.Meta.Description, Date: post.Published.Format("Mon, 02 Jan 2006 15:04:05 -0700")})
 	}
@@ -83,12 +83,12 @@ func (e *engine) writeFeed(file, title string, posts []document) error {
 }
 
 func (e *engine) generatedPage(stage, source, title, body string, items ...schemaListItem) error {
-	if _, err := os.Stat(filepath.Join(stage, source)); err == nil {
+	if _, err := os.Stat(filepath.Join(stage, e.source(source))); err == nil {
 		return fmt.Errorf("generated page collision: %s", source)
 	} else if !os.IsNotExist(err) {
 		return err
 	}
-	return e.writePage(stage, document{SchemaItems: items, Source: source, Body: body, Meta: metadata{Title: title, Language: e.language}, Front: map[string]any{"title": title, "language": e.language}})
+	return e.writePage(stage, document{SchemaItems: items, Source: e.source(source), Body: body, Meta: metadata{Title: title, Language: e.language}, Front: map[string]any{"title": title, "language": e.language}})
 }
 
 func (e *engine) buildSite(root string, now time.Time) error {
@@ -105,93 +105,9 @@ func (e *engine) buildSite(root string, now time.Time) error {
 	if err := os.MkdirAll(stage, 0755); err != nil {
 		return err
 	}
-	for _, d := range docs {
-		if !e.config.UnsafeHTML {
-			front, err := json.Marshal(d.Front)
-			if err != nil {
-				return err
-			}
-			_, err = margo.New().Compile(e.ctx, margo.Source{Name: d.Source, Content: []byte("---\n" + string(front) + "\n---\n" + d.Body)})
-			if err != nil {
-				return fmt.Errorf("%s: %w", d.Source, err)
-			}
-		}
-		sourceAssets := filepath.Join(root, "content", filepath.Dir(d.Source), "assets")
-		if _, err := os.Stat(sourceAssets); err == nil {
-			if err := copyTree(sourceAssets, filepath.Join(stage, filepath.Dir(d.Source), "assets")); err != nil {
-				return err
-			}
-		} else if !os.IsNotExist(err) {
-			return err
-		}
-		if d.Route != "" {
-			index, pagination := e.seriesNavigation(d, posts)
-			d.Body = index + d.Body + "\n\n" + pagination
-		}
-		if d.Route != "" && d.Meta.Cover != "" {
-			alt := d.Meta.CoverAlt
-			if alt == "" {
-				alt = d.Meta.Title
-			}
-			d.Body = "![" + alt + "](" + d.Meta.Cover + ")\n\n" + d.Body
-		}
-		if d.Source == "index.md" {
-			d.SchemaItems = e.postSchemaItems(posts[:min(e.config.HomeLimit, len(posts))])
-			list, err := e.listing(posts[:min(e.config.HomeLimit, len(posts))], d.Source)
-			if err != nil {
-				return err
-			}
-			d.Body += "\n\n" + e.seriesEntry(posts) + "\n\n" + list + "\n\n[" + e.config.Labels.AllArticles + "](/blogs/)\n"
-		}
-		if err := e.writePage(stage, d); err != nil {
-			return err
-		}
-	}
-	list, err := e.listing(posts, "blogs/index.md")
-	if err != nil {
-		return err
-	}
-	if err := e.generatedPage(stage, "blogs/index.md", e.config.Labels.Blog, e.seriesEntry(posts)+"\n\n"+list, e.postSchemaItems(posts)...); err != nil {
-		return err
-	}
-	type topic struct {
-		label string
-		posts []document
-	}
-	tags := map[string]*topic{}
-	for _, post := range posts {
-		for _, tag := range post.Meta.Tags {
-			slug := tagSlug(tag)
-			if tags[slug] == nil {
-				tags[slug] = &topic{label: tag}
-			}
-			tags[slug].posts = append(tags[slug].posts, post)
-		}
-	}
-	slugs := make([]string, 0, len(tags))
-	for slug := range tags {
-		slugs = append(slugs, slug)
-	}
-	sort.Strings(slugs)
-	var index strings.Builder
-	for _, slug := range slugs {
-		tag := tags[slug]
-		source := "tags/" + slug + "/index.md"
-		fmt.Fprintf(&index, "- [%s](/tags/%s/)\n", tag.label, slug)
-		list, err := e.listing(tag.posts, source)
-		if err != nil {
-			return err
-		}
-		if err := e.generatedPage(stage, source, tag.label, list, e.postSchemaItems(tag.posts)...); err != nil {
-			return err
-		}
-	}
-	for _, page := range []struct{ source, title, body string }{
-		{"tags/index.md", e.config.Labels.Tags, index.String()},
-		{"categories/index.md", e.config.Labels.Categories, e.config.Labels.CategoriesBody},
-		{"404.md", e.config.Labels.NotFound, e.config.Labels.NotFoundBody},
-	} {
-		if err := e.generatedPage(stage, page.source, page.title, page.body); err != nil {
+	for _, locale := range e.site.Locales.Supported {
+		local := e.forLocale(locale)
+		if err := local.prepareLocale(root, stage, render, localeDocuments(docs, locale), localeDocuments(posts, locale)); err != nil {
 			return err
 		}
 	}
@@ -216,22 +132,6 @@ func (e *engine) buildSite(root string, now time.Time) error {
 				return err
 			}
 		} else if !os.IsNotExist(err) {
-			return err
-		}
-	}
-	for _, feed := range []struct {
-		file, title string
-		posts       []document
-	}{
-		{"index.xml", e.site.Site.Name, posts}, {"blogs/index.xml", e.site.Site.Name + " · " + e.config.Labels.Blog, posts},
-		{"tags/index.xml", e.site.Site.Name + " · " + e.config.Labels.Tags, nil}, {"categories/index.xml", e.site.Site.Name + " · " + e.config.Labels.Categories, nil},
-	} {
-		if err := e.writeFeed(filepath.Join(render, feed.file), feed.title, feed.posts); err != nil {
-			return err
-		}
-	}
-	for _, slug := range slugs {
-		if err := e.writeFeed(filepath.Join(render, "tags", slug, "index.xml"), e.site.Site.Name+" · "+tags[slug].label, tags[slug].posts); err != nil {
 			return err
 		}
 	}
@@ -268,6 +168,7 @@ var aliasPattern = regexp.MustCompile(`^/[a-z0-9_/-]+/$`)
 func (e *engine) writeAliases(render string, posts []document) error {
 	var redirects []string
 	for _, post := range posts {
+		local := e.forLocale(post.Meta.Language)
 		for _, alias := range post.Meta.Aliases {
 			if !aliasPattern.MatchString(alias) || strings.Contains(alias, "..") {
 				return fmt.Errorf("unsafe alias: %s", alias)
@@ -279,7 +180,7 @@ func (e *engine) writeAliases(render string, posts []document) error {
 				return err
 			}
 			canonical := html.EscapeString(e.baseURL + post.Route)
-			if err := writeFile(target, []byte(`<!doctype html><html lang="`+html.EscapeString(e.language)+`"><head><meta charset="utf-8"><title>`+html.EscapeString(e.config.Labels.Redirecting)+`</title><link rel="canonical" href="`+canonical+`"><meta http-equiv="refresh" content="0; url=`+canonical+`"></head><body><a href="`+canonical+`"`+html.EscapeString(e.config.Labels.OpenArticle)+`</a></body></html>`)); err != nil {
+			if err := writeFile(target, []byte(`<!doctype html><html lang="`+html.EscapeString(local.language)+`"><head><meta charset="utf-8"><title>`+html.EscapeString(local.config.Labels.Redirecting)+`</title><link rel="canonical" href="`+canonical+`"><meta http-equiv="refresh" content="0; url=`+canonical+`"></head><body><a href="`+canonical+`">`+html.EscapeString(local.config.Labels.OpenArticle)+`</a></body></html>`)); err != nil {
 				return err
 			}
 			redirects = append(redirects, alias+" "+post.Route+" 301", strings.TrimSuffix(alias, "/")+" "+post.Route+" 301")
@@ -314,6 +215,119 @@ func publishDirectory(render, public string) error {
 	}
 	if hadPublic {
 		return os.RemoveAll(backup)
+	}
+	return nil
+}
+
+func (e *engine) prepareLocale(root, stage, render string, docs, posts []document) error {
+	for _, d := range docs {
+		if !e.config.UnsafeHTML {
+			front, err := json.Marshal(d.Front)
+			if err != nil {
+				return err
+			}
+			_, err = margo.New().Compile(e.ctx, margo.Source{Name: d.Source, Content: []byte("---\n" + string(front) + "\n---\n" + d.Body)})
+			if err != nil {
+				return fmt.Errorf("%s: %w", d.Source, err)
+			}
+		}
+		sourceAssets := filepath.Join(root, "content", filepath.Dir(d.Source), "assets")
+		if _, err := os.Stat(sourceAssets); err == nil {
+			if err := copyTree(sourceAssets, filepath.Join(stage, filepath.Dir(d.Source), "assets")); err != nil {
+				return err
+			}
+		} else if !os.IsNotExist(err) {
+			return err
+		}
+		if d.Route != "" {
+			index, pagination := e.seriesNavigation(d, posts)
+			d.Body = index + d.Body + "\n\n" + pagination
+		}
+		if d.Route != "" && d.Meta.Cover != "" {
+			alt := d.Meta.CoverAlt
+			if alt == "" {
+				alt = d.Meta.Title
+			}
+			d.Body = "![" + alt + "](" + d.Meta.Cover + ")\n\n" + d.Body
+		}
+		if d.Source == e.source("index.md") {
+			d.SchemaItems = e.postSchemaItems(posts[:min(e.config.HomeLimit, len(posts))])
+			list, err := e.listing(posts[:min(e.config.HomeLimit, len(posts))], d.Source)
+			if err != nil {
+				return err
+			}
+			d.Body += "\n\n" + e.seriesEntry(posts) + "\n\n" + list + "\n\n[" + e.config.Labels.AllArticles + "](" + e.route("/blogs/") + ")\n"
+		}
+		if err := e.writePage(stage, d); err != nil {
+			return err
+		}
+	}
+	list, err := e.listing(posts, e.source("blogs/index.md"))
+	if err != nil {
+		return err
+	}
+	if err := e.generatedPage(stage, "blogs/index.md", e.config.Labels.Blog, e.seriesEntry(posts)+"\n\n"+list, e.postSchemaItems(posts)...); err != nil {
+		return err
+	}
+	type topic struct {
+		label string
+		posts []document
+	}
+	tags := map[string]*topic{}
+	for _, post := range posts {
+		for _, tag := range post.Meta.Tags {
+			slug := tagSlug(tag)
+			if tags[slug] == nil {
+				tags[slug] = &topic{label: tag}
+			}
+			tags[slug].posts = append(tags[slug].posts, post)
+		}
+	}
+	slugs := make([]string, 0, len(tags))
+	for slug := range tags {
+		slugs = append(slugs, slug)
+	}
+	sort.Strings(slugs)
+	var index strings.Builder
+	for _, slug := range slugs {
+		tag := tags[slug]
+		source := "tags/" + slug + "/index.md"
+		fmt.Fprintf(&index, "- [%s](%s)\n", tag.label, e.route("/tags/"+slug+"/"))
+		list, err := e.listing(tag.posts, e.source(source))
+		if err != nil {
+			return err
+		}
+		if err := e.generatedPage(stage, source, tag.label, list, e.postSchemaItems(tag.posts)...); err != nil {
+			return err
+		}
+	}
+	for _, page := range []struct{ source, title, body string }{
+		{"tags/index.md", e.config.Labels.Tags, index.String()},
+		{"categories/index.md", e.config.Labels.Categories, e.config.Labels.CategoriesBody},
+		{"404.md", e.config.Labels.NotFound, e.config.Labels.NotFoundBody},
+	} {
+		if page.source == "404.md" && e.prefix != "" {
+			continue
+		}
+		if err := e.generatedPage(stage, page.source, page.title, page.body); err != nil {
+			return err
+		}
+	}
+	for _, feed := range []struct {
+		file, title string
+		posts       []document
+	}{
+		{"index.xml", e.site.Site.Name, posts}, {"blogs/index.xml", e.site.Site.Name + " · " + e.config.Labels.Blog, posts},
+		{"tags/index.xml", e.site.Site.Name + " · " + e.config.Labels.Tags, nil}, {"categories/index.xml", e.site.Site.Name + " · " + e.config.Labels.Categories, nil},
+	} {
+		if err := e.writeFeed(filepath.Join(render, e.source(feed.file)), feed.title, feed.posts); err != nil {
+			return err
+		}
+	}
+	for _, slug := range slugs {
+		if err := e.writeFeed(filepath.Join(render, e.source("tags"), slug, "index.xml"), e.site.Site.Name+" · "+tags[slug].label, tags[slug].posts); err != nil {
+			return err
+		}
 	}
 	return nil
 }

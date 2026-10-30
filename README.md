@@ -22,7 +22,7 @@ A Go consumer can pin `github.com/araihu/gazeta` in `go.mod` and call `gazeta.Ru
 
 `site.yaml` is native Margo configuration. It is the single source for `site.name`, `site.description`, `site.base_url`, logos, icons, social fallback image, webmanifest, navigation, theme and custom CSS. Set the default locale and readable date format there too. See the runnable example for the complete required identity.
 
-Gazeta requires `source: .build/content`, `output: public`, `site.home: index.md` and an origin without a path. One locale per publication is supported. Posts without `language` inherit `locales.default`; an explicit different locale fails validation.
+Gazeta requires `source: .build/content`, `output: public`, `site.home: index.md` and an origin without a path. Declare languages in `locales.supported`. Default-language sources stay at the content root; other sources use lowercase locale directories such as `content/pt-br/` and `content/es/`. Posts inherit the locale of their path; an explicit conflicting `language` fails validation. Each translation keeps its own canonical URL and JSON-LD language.
 
 `blog.yaml` holds editorial options:
 
@@ -45,11 +45,48 @@ labels:
   all_articles: All articles
 ```
 
-Authors match frontmatter names exactly. Profiles may use root-relative or HTTPS URLs. Unknown guests keep their names without inheriting another author's profile. A `ProfilePage` requires exactly one configured author whose profile URL matches the page. It describes that author as `mainEntity`. Generic `AboutPage` behavior remains available. `page_types` accepts `WebPage`, `AboutPage`, `ProfilePage`, `ContactPage` and `CollectionPage`, keyed by directory routes or standalone `.html` routes. See [structured data](docs/structured-data.md) for the schema contract and live validation procedure.
+Authors match frontmatter names exactly. An optional `type: Organization` declares an institutional author; omitted types remain `Person`. Organization biographies use `AboutPage`, while `ProfilePage` remains restricted to one person. Profiles may use root-relative or HTTPS URLs. Root-relative profiles follow the current locale prefix; provide the corresponding biography in each locale. External HTTPS profiles retain their configured URL. Unknown guests keep their names without inheriting another author's profile. A `ProfilePage` requires exactly one configured author whose profile URL matches the page. It describes that author as `mainEntity`. Generic `AboutPage` behavior remains available. `page_types` accepts `WebPage`, `AboutPage`, `ProfilePage`, `ContactPage` and `CollectionPage`, keyed by directory routes or standalone `.html` routes. See [structured data](docs/structured-data.md) for the schema contract and live validation procedure.
 
 Labels default to English. Available keys are `articles`, `blog`, `tags`, `categories`, `categories_body`, `not_found`, `not_found_body`, `all_articles`, `series`, `part`, `series_index`, `continue_series`, `start_series`, `start_first`, `previous`, `next`, `redirecting` and `open_article`. The two `*_body` fields accept Markdown. `files` copies regular files or directories, rejects symlinks and refuses to overwrite a different generated file. It cannot copy content or build directories around visibility filtering. The optional `static/` directory supplies hosting files.
 
 Markup uses neutral `.blog-home`, `.blog-content`, `.blog-posts`, `.blog-post`, `.blog-post-image`, `.blog-post-text`, `.blog-series`, `.blog-series-entry` and `.blog-series-pagination` classes. Style them through Margo's `custom_css`. Gazeta does not bundle a consumer's palette, logos or article artwork. `examples/minimal/assets/editorial.css` supplies a small starting layout.
+
+## Multilingual publications
+
+One publication has independent home pages, archives, tags, RSS feeds and series
+for each configured locale. Translate the same relative source path, for example
+`content/blogs/welcome/index.md`, `content/pt-br/blogs/welcome/index.md` and
+`content/es/blogs/welcome/index.md`. Matching paths identify equivalents; no
+translation is inferred from article titles, dates or tags. Missing translations
+remain absent. Drafts and future posts contribute neither equivalent links nor
+assets. Series names and part numbers are unique within their locale, and series
+navigation never crosses languages.
+
+`blog.yaml` accepts locale-specific label overrides:
+
+```yaml
+locales:
+  pt-BR:
+    articles: Artigos
+    blog: Artigos
+    all_articles: Ver todos os artigos
+    categories_body: Encontre publicações por [assunto](/pt-br/tags/).
+```
+
+These fields have the same keys as `labels`; unspecified values inherit the
+shared labels. Translate all visible editorial copy and use locale-specific URLs
+in Markdown labels. Margo localizes native English, pt-BR and Spanish controls.
+Header/footer destinations in `site.yaml` accept `locale`, for example
+`{label: Sobre, href: /pt-br/about/, locale: pt-BR}`. Shared links omit it.
+
+The native Margo head includes self and reciprocal `hreflang` links for visible,
+indexable equivalents. `x-default` points to the equivalent default-language page
+when available; it is omitted when that page does not exist. A single sitemap
+covers every indexable canonical page, while `/index.xml`, `/pt-br/index.xml` and
+`/es/index.xml` each contain only their own locale. The root 404 document uses the
+default language and stays out of discovery. Gazeta validates final equivalents,
+canonical identities, schema and locale feeds before replacing the publication.
+No browser-language or IP routing is added.
 
 ## Content and publication
 
@@ -104,7 +141,7 @@ Configuration and Git content are trusted build inputs. Margo layout commands an
 
 Authored raw HTML is denied by default through Margo's compiler policy. `unsafe_html: true` explicitly permits reviewed HTML/JavaScript demos. Gazeta's own escaped listing and series markup renders in either mode. Do not enable this option for unreviewed content.
 
-`v0.0.x` is an initial extraction, with domain-root hosting and one locale per blog. No content scheduler or provider-specific deploy credentials are included. A Git push can run the build and deploy `public/` through your existing pipeline.
+`v0.0.x` is an initial extraction, with domain-root hosting and locale-scoped content. No content scheduler or provider-specific deploy credentials are included. A Git push can run the build and deploy `public/` through your existing pipeline.
 
 ## Repository language
 

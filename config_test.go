@@ -13,6 +13,9 @@ func TestConfigRejectsInvalidContracts(t *testing.T) {
 		{"version: 1", "version: 2"}, {"home_limit: 4", "home_limit: 0"},
 		{"version: 1", "version: 1\nunknown: true"},
 		{"url: /about/", "url: javascript:alert(1)"},
+		{"url: /about/", "url: /about/\n    type: Corporation"},
+		{"url: /about/", "url: /about/\n    type: Organization"},
+		{"version: 1", "version: 1\nlocales: {fr: {blog: Articles}}"},
 		{"version: 1", "version: 1\nfiles: [{source: content, target: leaked}]"},
 		{"version: 1", "version: 1\nfiles: [{source: ../secret, target: leaked}]"},
 	} {

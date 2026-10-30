@@ -8,7 +8,7 @@ Gazeta declares editorial meaning through Margo's native `structured_data` API. 
 - Home contains `WebSite` and `WebPage` with the visible post list. Site name and URL come from native `site.yaml` identity.
 - Archives use `CollectionPage` and an `ItemList` matching the visible posts and order.
 - Explicit `ProfilePage` pages identify one configured author as `mainEntity`, with `Person`, name, URL and a stable page-local identifier. The profile URL must match the page. Missing or ambiguous author binding fails configuration.
-- `AboutPage`, `ContactPage` and plain `WebPage` describe authored pages. An `AboutPage` with one matching author still includes that person for compatibility.
+- `AboutPage`, `ContactPage` and plain `WebPage` describe authored pages. An `AboutPage` with one matching author includes its configured Person or Organization identity.
 - Alias stubs and 404 omit JSON-LD. Draft and future posts remain absent from the publication.
 
 Directory `index.md` pages use directory URLs. Other `.md` pages use `.html` URLs, matching Margo's actual canonical output. A filename such as `myindex.md` remains `myindex.html`.
@@ -28,7 +28,7 @@ Profile pages must actually focus on the configured author. Do not label a gener
 
 [Google's Article documentation](https://developers.google.com/search/docs/appearance/structured-data/article) currently lists recommended properties, with no required properties. Gazeta provides applicable source fields; it does not fabricate `dateModified` or a publisher to remove hypothetical warnings. Timestamps retain their timezone. Each series part keeps its own canonical URL.
 
-Google recommends [ProfilePage markup](https://developers.google.com/search/docs/appearance/structured-data/profile-page) for an internal author biography. An About Me page on a blog is an explicit valid use case. The required data is a `mainEntity` describing the person or organization and its name. Gazeta currently models individual authors as `Person`.
+Google recommends [ProfilePage markup](https://developers.google.com/search/docs/appearance/structured-data/profile-page) for an internal author biography. An About Me page on a blog is an explicit valid use case. The required data is a `mainEntity` describing the person or organization and its name. Gazeta models individual authors as `Person` and explicit institutional authors as `Organization`. Institutional biographies use `AboutPage`.
 
 [Site name documentation](https://developers.google.com/search/docs/appearance/site-names) calls for home `WebSite.name` and `url`, both supplied by Gazeta. The Rich Results Test only reports supported rich-result features. A home or generic archive can therefore show `No items detected` while retaining valid WebSite or CollectionPage data. Do not add article, FAQ, review or breadcrumb markup to those pages merely to change that message.
 
