@@ -164,4 +164,7 @@ func TestVerifyRetriesAndCancellation(t *testing.T) {
 	if _, err := Verify(context.Background(), root, VerifyOptions{}); err == nil || !strings.Contains(err.Error(), "local publication") {
 		t.Fatalf("local artifact drift accepted: %v", err)
 	}
+	if err := Check(root, buildTime); err == nil || !strings.Contains(err.Error(), "local publication") {
+		t.Fatalf("artifact check accepted digest drift: %v", err)
+	}
 }

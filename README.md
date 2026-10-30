@@ -74,7 +74,7 @@ Series use `series` plus a positive, unique `seriesPart`. Navigation only includ
 
 Gazeta generates `/blogs/`, `/tags/`, `/categories/`, `404.html`, RSS, safe redirect stubs and Cloudflare-compatible `_redirects`. These generated page names are reserved. Root home and page content stay consumer-owned. Covers must be real local `assets/` files under the post. Native Margo social metadata and `BlogPosting.image` use the same cover; posts without a cover omit the JSON-LD image.
 
-Builds stage content in `.build/`, render through Margo, assemble public assets and use `site.MarshalManifest` for final byte identities. Validation checks canonical URLs, locale, JSON-LD, local links and fragments, social covers, RSS and configured legacy URLs before replacing `public/`. A failed build preserves the previous publication. A build lock prevents two writers on one root. After a crashed build, remove `.build/build.lock` only once its process has stopped.
+Builds stage content in `.build/`, render through Margo, assemble public assets and use `site.MarshalManifest` for final byte identities. Validation checks canonical URLs, locale, JSON-LD, local links and fragments, social covers, RSS and configured legacy URLs before replacing `public/`. `check` also verifies the existing artifact bytes against their native Margo manifest. A failed build preserves the previous publication. A build lock prevents two writers on one root. After a crashed build, remove `.build/build.lock` only once its process has stopped.
 
 ## Verify a deployed publication
 

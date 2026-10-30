@@ -200,5 +200,9 @@ func Check(root string, now time.Time) error {
 	if err != nil {
 		return err
 	}
-	return e.checkSite(root, filepath.Join(root, "public"), now)
+	if err := e.checkSite(root, filepath.Join(root, "public"), now); err != nil {
+		return err
+	}
+	_, err = loadPublicationVerification(root)
+	return err
 }

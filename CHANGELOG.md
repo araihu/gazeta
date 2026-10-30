@@ -1,5 +1,6 @@
 ## v0.0.3
 
+- Validate local artifact integrity through Margo in `gazeta check`.
 - Add `gazeta verify` and a Go API for validating a deployed artifact against its local Margo manifest.
 - Check public HTML/schema, exact asset bytes, legacy redirects and missing-page HTTP status with bounded propagation retries.
 - Emit a JSON verification receipt without rebuilding or publishing.
