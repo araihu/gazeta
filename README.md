@@ -84,6 +84,10 @@ Authored raw HTML is denied by default through Margo's compiler policy. `unsafe_
 
 `v0.0.x` is an initial extraction, with domain-root hosting and one locale per blog. No content scheduler or provider-specific deploy credentials are included. A Git push can run the build and deploy `public/` through your existing pipeline.
 
+## Repository language
+
+Write repository documentation, GoDoc, source-code identifiers, code comments and developer-facing tooling messages in English, including upstream contributions. Published content and UI labels follow the configured locale. Preserve intentional localization/Unicode fixtures and compatibility-sensitive values.
+
 ## Verify and release
 
 ```sh
