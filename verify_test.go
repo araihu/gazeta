@@ -15,9 +15,14 @@ import (
 	"time"
 )
 
-func verificationFixture(t *testing.T, mode *atomic.Value) (string, *publicationVerification) {
+func verificationFixture(t *testing.T, mode *atomic.Value, roots ...string) (string, *publicationVerification) {
 	t.Helper()
-	root := exampleRoot(t)
+	root := ""
+	if len(roots) > 0 {
+		root = roots[0]
+	} else {
+		root = exampleRoot(t)
+	}
 	var origin string
 	var manifestRequests atomic.Int32
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -32,8 +37,8 @@ func verificationFixture(t *testing.T, mode *atomic.Value) (string, *publication
 			fmt.Fprint(w, readTestFile(t, root, "public/404.html"))
 			return
 		}
-		if r.URL.Path == "/posts/hello/" {
-			target := origin + "/blogs/hello/"
+		if r.URL.Path == "/posts/hello/" || r.URL.Path == "/pt-br/posts/hello/" || r.URL.Path == "/es/posts/hello/" {
+			target := origin + strings.Replace(r.URL.Path, "/posts/", "/blogs/", 1)
 			if behavior == "wrong alias" {
 				target = origin + "/about/"
 			}
@@ -70,9 +75,13 @@ func verificationFixture(t *testing.T, mode *atomic.Value) (string, *publication
 		if name == "assets/editorial.css" && behavior == "wrong asset" {
 			data = []byte("body { display: none }")
 		}
-		if name == "blogs/hello/index.html" {
+		if name == "blogs/hello/index.html" || name == "es/blogs/hello/index.html" {
 			text := string(data)
 			switch behavior {
+			case "wrong localized canonical":
+				if name == "es/blogs/hello/index.html" {
+					text = strings.Replace(text, `rel="canonical" href="`+origin+`/es/blogs/hello/"`, `rel="canonical" href="`+origin+`/blogs/hello/"`, 1)
+				}
 			case "wrong author":
 				text = strings.ReplaceAll(text, "Alex Example", "Another Author")
 			case "wrong canonical":
@@ -166,5 +175,18 @@ func TestVerifyRetriesAndCancellation(t *testing.T) {
 	}
 	if err := Check(root, buildTime); err == nil || !strings.Contains(err.Error(), "local publication") {
 		t.Fatalf("artifact check accepted digest drift: %v", err)
+	}
+}
+
+func TestVerifyMultilingualPublication(t *testing.T) {
+	var mode atomic.Value
+	mode.Store("")
+	_, verifier := verificationFixture(t, &mode, multilingualRoot(t))
+	if err := verifier.check(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	mode.Store("wrong localized canonical")
+	if err := verifier.check(context.Background()); err == nil || !strings.Contains(err.Error(), "canonical") {
+		t.Fatalf("accepted incorrect translated canonical: %v", err)
 	}
 }

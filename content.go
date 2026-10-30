@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/araihu/margo/site"
 	"github.com/pelletier/go-toml/v2"
 	"golang.org/x/text/unicode/norm"
 )
@@ -86,7 +87,7 @@ func (d document) visible(now time.Time) bool {
 	return !d.Meta.Draft && (d.Published.IsZero() || !d.Published.After(now))
 }
 
-func loadDocuments(root string, now time.Time) ([]document, []document, error) {
+func loadDocuments(root string, now time.Time, locales ...site.LocaleConfig) ([]document, []document, error) {
 	var docs, posts []document
 	seriesParts := map[string]map[int]bool{}
 	err := filepath.WalkDir(filepath.Join(root, "content"), func(file string, entry fs.DirEntry, err error) error {
@@ -115,8 +116,19 @@ func loadDocuments(root string, now time.Time) ([]document, []document, error) {
 			return err
 		}
 		d.Source = filepath.ToSlash(relative)
-		if strings.HasPrefix(d.Source, "blogs/") {
-			if path.Base(d.Source) != "index.md" || path.Dir(d.Source) == "blogs" {
+		localSource := d.Source
+		if len(locales) > 0 {
+			locale, source := documentLocale(d.Source, locales[0])
+			if strings.HasPrefix(d.Source, strings.ToLower(locales[0].Default)+"/") {
+				return fmt.Errorf("default locale content must remain at the content root: %s", d.Source)
+			}
+			if d.Meta.Language != "" && d.Meta.Language != locale {
+				return fmt.Errorf("%s: language must match its locale path", d.Source)
+			}
+			d.Meta.Language, d.Front["language"], localSource = locale, locale, source
+		}
+		if strings.HasPrefix(localSource, "blogs/") {
+			if path.Base(d.Source) != "index.md" || path.Dir(localSource) == "blogs" {
 				return fmt.Errorf("post must be blogs/<slug>/index.md: %s", file)
 			}
 			d.Route = "/" + path.Dir(d.Source) + "/"
@@ -148,13 +160,14 @@ func loadDocuments(root string, now time.Time) ([]document, []document, error) {
 			}
 			posts = append(posts, d)
 			if d.Meta.Series != "" {
-				if seriesParts[d.Meta.Series] == nil {
-					seriesParts[d.Meta.Series] = map[int]bool{}
+				seriesKey := d.Meta.Language + "\x00" + d.Meta.Series
+				if seriesParts[seriesKey] == nil {
+					seriesParts[seriesKey] = map[int]bool{}
 				}
-				if seriesParts[d.Meta.Series][d.Meta.SeriesPart] {
+				if seriesParts[seriesKey][d.Meta.SeriesPart] {
 					return fmt.Errorf("duplicate part %d in series %s", d.Meta.SeriesPart, d.Meta.Series)
 				}
-				seriesParts[d.Meta.Series][d.Meta.SeriesPart] = true
+				seriesParts[seriesKey][d.Meta.SeriesPart] = true
 			}
 		}
 		docs = append(docs, d)
@@ -197,7 +210,7 @@ func (e *engine) publicationLinks(m metadata) map[string]any {
 		}
 	}
 	for _, tag := range m.Tags {
-		tags[tag] = e.baseURL + "/tags/" + tagSlug(tag) + "/"
+		tags[tag] = e.baseURL + e.route("/tags/") + tagSlug(tag) + "/"
 	}
 	return map[string]any{"authors": authors, "tags": tags}
 }
@@ -235,7 +248,7 @@ func (e *engine) writePage(stage string, d document) error {
 		heading = first + "\n\n"
 	}
 	class := "blog-content"
-	if d.Source == "index.md" {
+	if d.Source == e.source("index.md") {
 		class = "blog-home"
 	}
 	frontmatter := make(map[string]any, len(d.Front)+1)
@@ -270,17 +283,5 @@ func (e *engine) writePage(stage string, d document) error {
 }
 
 func (e *engine) loadDocuments(root string, now time.Time) ([]document, []document, error) {
-	docs, posts, err := loadDocuments(root, now)
-	for _, list := range [][]document{docs, posts} {
-		for i := range list {
-			if list[i].Meta.Language == "" {
-				list[i].Meta.Language = e.language
-				list[i].Front["language"] = e.language
-			}
-			if list[i].Meta.Language != e.language {
-				return nil, nil, fmt.Errorf("%s: language must match locales.default", list[i].Source)
-			}
-		}
-	}
-	return docs, posts, err
+	return loadDocuments(root, now, e.site.Locales)
 }

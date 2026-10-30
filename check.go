@@ -23,10 +23,11 @@ type htmlPage struct {
 	Schemas                     []json.RawMessage
 	HeadSchemas, CanonicalCount int
 	HeadMetadata                map[string][]string
+	Alternates                  map[string][]string
 }
 
 func readHTML(data []byte) (htmlPage, error) {
-	page := htmlPage{IDs: map[string]bool{}, HeadMetadata: map[string][]string{}}
+	page := htmlPage{IDs: map[string]bool{}, HeadMetadata: map[string][]string{}, Alternates: map[string][]string{}}
 	root, err := html.Parse(strings.NewReader(string(data)))
 	if err != nil {
 		return page, err
@@ -50,6 +51,9 @@ func readHTML(data []byte) (htmlPage, error) {
 					key = attrs["name"]
 				}
 				page.HeadMetadata[key] = append(page.HeadMetadata[key], attrs["content"])
+			}
+			if n.Data == "link" && attrs["rel"] == "alternate" && attrs["hreflang"] != "" && n.Parent != nil && n.Parent.Data == "head" {
+				page.Alternates[attrs["hreflang"]] = append(page.Alternates[attrs["hreflang"]], attrs["href"])
 			}
 			if n.Data == "link" && attrs["rel"] == "canonical" {
 				page.Canonical = attrs["href"]
@@ -184,7 +188,14 @@ func (e *engine) checkSite(root, public string, now time.Time) error {
 			return err
 		}
 		route := publicRoute(filepath.ToSlash(relative))
-		if page.Language != e.language {
+		locale, _ := documentLocale(strings.TrimPrefix(route, "/"), e.site.Locales)
+		for _, post := range posts {
+			if isAlias(route, []document{post}) {
+				locale = post.Meta.Language
+			}
+		}
+		local := e.forLocale(locale)
+		if page.Language != local.language {
 			failures = append(failures, route+": incorrect language")
 		}
 		if !strings.HasPrefix(page.Canonical, e.baseURL+"/") {
@@ -193,9 +204,9 @@ func (e *engine) checkSite(root, public string, now time.Time) error {
 		if route == "/404.html" && !reflect.DeepEqual(page.HeadMetadata["robots"], []string{"noindex, follow"}) {
 			failures = append(failures, route+": expected native noindex robots metadata")
 		}
-		schemaErr := e.checkSchema(page, expected[route])
+		schemaErr := local.checkSchema(page, expected[route])
 		if expected[route] == nil && route != "/404.html" && !isAlias(route, posts) {
-			schemaErr = e.checkNonPostSchema(page, route, posts)
+			schemaErr = local.checkNonPostSchema(page, route, localeDocuments(posts, locale))
 		}
 		if err := schemaErr; err != nil {
 			failures = append(failures, route+": "+err.Error())
@@ -280,24 +291,33 @@ func (e *engine) checkSite(root, public string, now time.Time) error {
 			failures = append(failures, "legacy URL missing: "+route)
 		}
 	}
-	data, err := os.ReadFile(filepath.Join(public, "index.xml"))
-	if err != nil {
-		return err
-	}
-	var feed rss
-	if err := xml.Unmarshal(data, &feed); err != nil {
-		return err
-	}
-	if len(feed.Channel.Items) != len(posts) {
-		failures = append(failures, "RSS item count differs from published posts")
-	}
-	for i, item := range feed.Channel.Items {
-		if i >= len(posts) {
-			break
+	for _, locale := range e.site.Locales.Supported {
+		local, localPosts := e.forLocale(locale), localeDocuments(posts, locale)
+		data, err := os.ReadFile(filepath.Join(public, local.source("index.xml")))
+		if err != nil {
+			return err
 		}
-		if item.Link != e.baseURL+posts[i].Route || item.Title != posts[i].Meta.Title {
-			failures = append(failures, "RSS order or metadata differs from posts")
+		var feed rss
+		if err := xml.Unmarshal(data, &feed); err != nil {
+			return err
 		}
+		if feed.Channel.Language != locale || feed.Channel.Link != e.baseURL+local.route("/") {
+			failures = append(failures, "RSS identity differs from its locale")
+		}
+		if len(feed.Channel.Items) != len(localPosts) {
+			failures = append(failures, "RSS item count differs from published posts")
+		}
+		for i, item := range feed.Channel.Items {
+			if i >= len(localPosts) {
+				break
+			}
+			if item.Link != e.baseURL+localPosts[i].Route || item.Title != localPosts[i].Meta.Title {
+				failures = append(failures, "RSS order or metadata differs from posts")
+			}
+		}
+	}
+	if err := e.checkAlternates(public, pages, posts); err != nil {
+		failures = append(failures, err.Error())
 	}
 	if len(failures) > 0 {
 		return fmt.Errorf("site validation failed:\n%s", strings.Join(failures, "\n"))

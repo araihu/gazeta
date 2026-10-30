@@ -29,13 +29,14 @@ func (e *engine) checkNonPostSchema(page htmlPage, route string, posts []documen
 	if data["@context"] != "https://schema.org" {
 		return fmt.Errorf("invalid JSON-LD context")
 	}
-	if route == "/" {
+	localRoute := "/" + strings.TrimPrefix(strings.TrimPrefix(route, "/"), e.prefix)
+	if localRoute == "/" {
 		graph, ok := data["@graph"].([]any)
 		if !ok || len(graph) != 2 {
 			return fmt.Errorf("home requires WebSite and WebPage")
 		}
 		website, ok := graph[0].(map[string]any)
-		if !ok || website["@type"] != "WebSite" || website["@id"] != e.baseURL+"/#website" || website["name"] != e.site.Site.Name || website["url"] != e.baseURL+"/" {
+		if !ok || website["@type"] != "WebSite" || website["@id"] != e.baseURL+e.route("/")+"#website" || website["name"] != e.site.Site.Name || website["url"] != e.baseURL+e.route("/") {
 			return fmt.Errorf("incorrect WebSite identity")
 		}
 		data, ok = graph[1].(map[string]any)
@@ -57,26 +58,26 @@ func (e *engine) checkNonPostSchema(page htmlPage, route string, posts []documen
 		}
 	}
 	parent, ok := data["isPartOf"].(map[string]any)
-	if !ok || parent["@id"] != e.baseURL+"/#website" {
+	if !ok || parent["@id"] != e.baseURL+e.route("/")+"#website" {
 		return fmt.Errorf("missing WebSite reference")
 	}
 	for name := range e.config.Authors {
 		if (kind == "AboutPage" || kind == "ProfilePage") && e.authorURL(name) == e.baseURL+route {
 			person, ok := data["mainEntity"].(map[string]any)
-			if !ok || person["@type"] != "Person" || person["@id"] != e.baseURL+route+"#person" || person["name"] != name || person["url"] != e.authorURL(name) {
+			if !ok || person["@type"] != e.authorType(name) || person["@id"] != e.baseURL+route+"#"+strings.ToLower(e.authorType(name)) || person["name"] != name || person["url"] != e.authorURL(name) {
 				return fmt.Errorf("incorrect author identity")
 			}
 		}
 	}
 	var listed []document
 	switch {
-	case route == "/":
+	case localRoute == "/":
 		listed = posts[:min(e.config.HomeLimit, len(posts))]
-	case route == "/blogs/":
+	case localRoute == "/blogs/":
 		listed = posts
-	case strings.HasPrefix(route, "/tags/") && route != "/tags/":
+	case strings.HasPrefix(localRoute, "/tags/") && localRoute != "/tags/":
 		listed = make([]document, 0)
-		slug := strings.TrimSuffix(strings.TrimPrefix(route, "/tags/"), "/")
+		slug := strings.TrimSuffix(strings.TrimPrefix(localRoute, "/tags/"), "/")
 		for _, post := range posts {
 			for _, tag := range post.Meta.Tags {
 				if tagSlug(tag) == slug {
@@ -137,7 +138,7 @@ func (e *engine) structuredData(d document) blogPosting {
 	canonical := e.baseURL + (&url.URL{Path: d.Route}).String()
 	data := blogPosting{Context: "https://schema.org", Type: "BlogPosting", ID: canonical + "#blogposting", URL: canonical, MainEntityOfPage: canonical, Headline: d.Meta.Title, Description: d.Meta.Description, Language: d.Meta.Language, Published: d.Meta.PublishedAt, Modified: d.Meta.ModifiedAt}
 	for _, author := range d.Meta.Authors {
-		p := person{Type: "Person", Name: author, URL: e.authorURL(author)}
+		p := person{Type: e.authorType(author), Name: author, URL: e.authorURL(author)}
 		data.Authors = append(data.Authors, p)
 	}
 	if d.Meta.Cover != "" {

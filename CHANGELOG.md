@@ -1,3 +1,10 @@
+## v0.0.5
+
+- Support native locale-scoped pages, archives, tags, RSS and series in one publication.
+- Validate reciprocal/self hreflang, default-language fallback and per-locale identity.
+- Support explicit Organization authors and institutional AboutPage metadata.
+- Test three locales, missing translations, private content and successive identity changes.
+
 ## v0.0.4
 
 - Use native Margo noindex metadata for the generated 404 page and omit it from sitemap and llms.txt.

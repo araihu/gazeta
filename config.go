@@ -18,7 +18,8 @@ import (
 )
 
 type author struct {
-	URL string `yaml:"url"`
+	URL  string `yaml:"url"`
+	Type string `yaml:"type"`
 }
 type fileCopy struct {
 	Source string `yaml:"source"`
@@ -53,6 +54,7 @@ type config struct {
 	RequiredURLs string            `yaml:"required_urls"`
 	Files        []fileCopy        `yaml:"files"`
 	Labels       labels            `yaml:"labels"`
+	Locales      map[string]labels `yaml:"locales"`
 }
 
 // engine is private to a build. No mutable package-wide blog identity is used.
@@ -60,6 +62,7 @@ type engine struct {
 	config                        config
 	site                          site.Config
 	baseURL, language, dateFormat string
+	prefix                        string
 	ctx                           context.Context
 }
 
@@ -112,6 +115,9 @@ func loadEngine(root string) (*engine, error) {
 		e.dateFormat = "2006-01-02"
 	}
 	for name, a := range c.Authors {
+		if a.Type != "" && a.Type != "Person" && a.Type != "Organization" {
+			return nil, fmt.Errorf("author %q requires type Person or Organization", name)
+		}
 		profile, err := url.Parse(a.URL)
 		if strings.TrimSpace(name) == "" || err != nil || a.URL == "" || profile.User != nil || strings.ContainsAny(a.URL, "\\\x00\r\n") {
 			return nil, fmt.Errorf("invalid author profile: %q", name)
@@ -143,8 +149,17 @@ func loadEngine(root string) (*engine, error) {
 		default:
 			return nil, fmt.Errorf("unsupported page type: %s", kind)
 		}
-		if kind == "ProfilePage" && profiles[e.baseURL+route] == "" {
+		if kind == "ProfilePage" && (profiles[e.baseURL+route] == "" || e.authorType(profiles[e.baseURL+route]) != "Person") {
 			return nil, fmt.Errorf("ProfilePage %s requires one matching configured author URL", route)
+		}
+	}
+	for locale := range c.Locales {
+		found := false
+		for _, supported := range s.Locales.Supported {
+			found = found || locale == supported
+		}
+		if !found {
+			return nil, fmt.Errorf("blog locale %q is not supported by site.yaml", locale)
 		}
 	}
 	if c.RequiredURLs != "" && !fs.ValidPath(c.RequiredURLs) {

@@ -9,7 +9,7 @@ import (
 func (e *engine) authorURL(name string) string {
 	profile := e.config.Authors[name].URL
 	if strings.HasPrefix(profile, "/") {
-		return e.baseURL + profile
+		return e.baseURL + e.route(profile)
 	}
 	return profile
 }
@@ -18,8 +18,12 @@ func (e *engine) pageType(route string) string {
 	if kind := e.config.PageTypes[route]; kind != "" {
 		return kind
 	}
-	if route == "/blogs/" || strings.HasPrefix(route, "/tags/") {
+	localRoute := "/" + strings.TrimPrefix(strings.TrimPrefix(route, "/"), e.prefix)
+	if localRoute == "/blogs/" || strings.HasPrefix(localRoute, "/tags/") {
 		return "CollectionPage"
+	}
+	if kind := e.config.PageTypes[localRoute]; kind != "" {
+		return kind
 	}
 	return "WebPage"
 }
@@ -32,13 +36,20 @@ func (e *engine) pageStructuredData(d document) any {
 			options["image"] = image
 		}
 		profiles := map[string]string{}
+		types := map[string]string{}
 		for _, author := range d.Meta.Authors {
+			if e.authorType(author) != "Person" {
+				types[author] = e.authorType(author)
+			}
 			if profile := e.authorURL(author); profile != "" {
 				profiles[author] = profile
 			}
 		}
 		if len(profiles) > 0 {
 			options["author_urls"] = profiles
+		}
+		if len(types) > 0 {
+			options["author_types"] = types
 		}
 		return options
 	}
@@ -50,23 +61,23 @@ func (e *engine) pageStructuredData(d document) any {
 	kind := e.pageType(route)
 	page := map[string]any{
 		"@context": "https://schema.org", "@type": kind, "@id": canonical + "#webpage", "url": canonical,
-		"name": d.Meta.Title, "inLanguage": e.language, "isPartOf": map[string]string{"@id": e.baseURL + "/#website"},
+		"name": d.Meta.Title, "inLanguage": e.language, "isPartOf": map[string]string{"@id": e.baseURL + e.route("/") + "#website"},
 	}
 	if d.Meta.Description != "" {
 		page["description"] = d.Meta.Description
 	}
 	for name := range e.config.Authors {
 		if (kind == "AboutPage" || kind == "ProfilePage") && e.authorURL(name) == canonical {
-			page["mainEntity"] = map[string]string{"@type": "Person", "@id": canonical + "#person", "name": name, "url": canonical}
+			page["mainEntity"] = map[string]string{"@type": e.authorType(name), "@id": canonical + "#" + strings.ToLower(e.authorType(name)), "name": name, "url": canonical}
 		}
 	}
 	if d.SchemaItems != nil {
 		page["mainEntity"] = map[string]any{"@type": "ItemList", "numberOfItems": len(d.SchemaItems), "itemListElement": d.SchemaItems}
 	}
-	if d.Source == "index.md" {
+	if d.Source == e.source("index.md") {
 		delete(page, "@context")
 		return map[string]any{"@context": "https://schema.org", "@graph": []any{
-			map[string]any{"@type": "WebSite", "@id": e.baseURL + "/#website", "url": e.baseURL + "/", "name": e.site.Site.Name, "inLanguage": e.language}, page,
+			map[string]any{"@type": "WebSite", "@id": e.baseURL + e.route("/") + "#website", "url": e.baseURL + e.route("/"), "name": e.site.Site.Name, "inLanguage": e.language}, page,
 		}}
 	}
 	return page
