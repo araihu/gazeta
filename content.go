@@ -242,6 +242,9 @@ func (e *engine) writePage(stage string, d document) error {
 	for key, value := range d.Front {
 		frontmatter[key] = value
 	}
+	if d.Source == "404.md" {
+		frontmatter["noindex"] = true
+	}
 	if d.Route != "" {
 		frontmatter["publication_links"] = e.publicationLinks(d.Meta)
 		if d.Meta.Cover != "" {

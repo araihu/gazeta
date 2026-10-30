@@ -95,6 +95,16 @@ func TestBuildIndependentIdentities(t *testing.T) {
 			if !strings.Contains(html, `href="`+profile+`"`) || !strings.Contains(html, ">January 1, 2026</time>") {
 				t.Fatal("native author/date missing")
 			}
+
+			notFound := readTestFile(t, root, "public/404.html")
+			if !strings.Contains(notFound, `<meta name="robots" content="noindex, follow"`) {
+				t.Fatal("generated 404 page is indexable")
+			}
+			for _, name := range []string{"sitemap.xml", "llms.txt"} {
+				if strings.Contains(readTestFile(t, root, "public/"+name), identity.domain+"/404.html") {
+					t.Fatalf("%s advertises the error page", name)
+				}
+			}
 			feed := readTestFile(t, root, "public/index.xml")
 			if !strings.Contains(feed, "<title>"+identity.name+"</title>") || !strings.Contains(feed, identity.domain+"/blogs/hello/") {
 				t.Fatal("RSS identity differs")

@@ -190,6 +190,9 @@ func (e *engine) checkSite(root, public string, now time.Time) error {
 		if !strings.HasPrefix(page.Canonical, e.baseURL+"/") {
 			failures = append(failures, route+": invalid canonical")
 		}
+		if route == "/404.html" && !reflect.DeepEqual(page.HeadMetadata["robots"], []string{"noindex, follow"}) {
+			failures = append(failures, route+": expected native noindex robots metadata")
+		}
 		schemaErr := e.checkSchema(page, expected[route])
 		if expected[route] == nil && route != "/404.html" && !isAlias(route, posts) {
 			schemaErr = e.checkNonPostSchema(page, route, posts)
@@ -222,6 +225,9 @@ func (e *engine) checkSite(root, public string, now time.Time) error {
 				failures = append(failures, route+": missing fragment "+ref)
 			}
 		}
+	}
+	if err := checkSitemap(public, pages); err != nil {
+		failures = append(failures, err.Error())
 	}
 	for route, post := range expected {
 		file := filepath.Join(public, strings.TrimPrefix(route, "/"), "index.html")

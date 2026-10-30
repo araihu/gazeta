@@ -1,3 +1,8 @@
+## v0.0.4
+
+- Use native Margo noindex metadata for the generated 404 page and omit it from sitemap and llms.txt.
+- Validate exact sitemap coverage of indexable canonical pages before publication.
+
 ## v0.0.3
 
 - Validate local artifact integrity through Margo in `gazeta check`.
